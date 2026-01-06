@@ -21,11 +21,9 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 
 class LeaderboardSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.name', read_only=True)
-
     class Meta:
         model = Leaderboard
-        fields = ['id', 'user_id', 'user_name', 'points', 'rank', 'updated_at']
+        fields = ['id', 'user_id', 'points', 'rank', 'updated_at']
 
 
 class WorkoutSerializer(serializers.ModelSerializer):
