@@ -1,57 +1,164 @@
 from django.core.management.base import BaseCommand
-from django.contrib.auth import get_user_model
-from djongo import models
+from octofit_tracker.models import User, Team, Activity, Leaderboard, Workout
+from datetime import date, timedelta
+import random
 
-from pymongo import MongoClient
 
 class Command(BaseCommand):
     help = 'Populate the octofit_db database with test data'
 
     def handle(self, *args, **options):
-        # Connect to MongoDB
-        client = MongoClient('localhost', 27017)
-        db = client['octofit_db']
+        self.stdout.write('Deleting existing data...')
+        
+        # Delete all existing data
+        User.objects.all().delete()
+        Team.objects.all().delete()
+        Activity.objects.all().delete()
+        Leaderboard.objects.all().delete()
+        Workout.objects.all().delete()
 
-        # Drop collections if they exist
-        db.users.drop()
-        db.teams.drop()
-        db.activities.drop()
-        db.leaderboard.drop()
-        db.workouts.drop()
+        self.stdout.write('Creating teams...')
+        
+        # Create teams
+        team_marvel = Team.objects.create(
+            name='Team Marvel',
+            description='Assemble! Marvel superheroes working together for fitness excellence.'
+        )
+        
+        team_dc = Team.objects.create(
+            name='Team DC',
+            description='Justice League members committed to peak physical performance.'
+        )
 
-        # Create unique index on email for users
-        db.users.create_index([('email', 1)], unique=True)
+        self.stdout.write('Creating users...')
+        
+        # Create Marvel users
+        marvel_users = [
+            User.objects.create(name='Iron Man', email='tony@stark.com', team_id=team_marvel.id),
+            User.objects.create(name='Captain America', email='steve@rogers.com', team_id=team_marvel.id),
+            User.objects.create(name='Black Widow', email='natasha@romanoff.com', team_id=team_marvel.id),
+            User.objects.create(name='Thor', email='thor@asgard.com', team_id=team_marvel.id),
+            User.objects.create(name='Hulk', email='bruce@banner.com', team_id=team_marvel.id),
+        ]
+        
+        # Create DC users
+        dc_users = [
+            User.objects.create(name='Superman', email='clark@kent.com', team_id=team_dc.id),
+            User.objects.create(name='Batman', email='bruce@wayne.com', team_id=team_dc.id),
+            User.objects.create(name='Wonder Woman', email='diana@prince.com', team_id=team_dc.id),
+            User.objects.create(name='Flash', email='barry@allen.com', team_id=team_dc.id),
+            User.objects.create(name='Aquaman', email='arthur@curry.com', team_id=team_dc.id),
+        ]
 
-        # Sample data
-        users = [
-            {"name": "Superman", "email": "superman@dc.com", "team": "DC"},
-            {"name": "Batman", "email": "batman@dc.com", "team": "DC"},
-            {"name": "Wonder Woman", "email": "wonderwoman@dc.com", "team": "DC"},
-            {"name": "Iron Man", "email": "ironman@marvel.com", "team": "Marvel"},
-            {"name": "Captain America", "email": "cap@marvel.com", "team": "Marvel"},
-            {"name": "Black Widow", "email": "widow@marvel.com", "team": "Marvel"},
-        ]
-        teams = [
-            {"name": "Marvel", "members": ["Iron Man", "Captain America", "Black Widow"]},
-            {"name": "DC", "members": ["Superman", "Batman", "Wonder Woman"]},
-        ]
-        activities = [
-            {"user": "Superman", "activity": "Flying", "duration": 120},
-            {"user": "Iron Man", "activity": "Suit Training", "duration": 90},
-        ]
-        leaderboard = [
-            {"team": "Marvel", "points": 250},
-            {"team": "DC", "points": 200},
-        ]
+        all_users = marvel_users + dc_users
+
+        self.stdout.write('Creating activities...')
+        
+        # Create activities for each user
+        activity_types = ['Running', 'Swimming', 'Cycling', 'Strength Training', 'Yoga']
+        
+        for user in all_users:
+            for i in range(10):
+                activity_type = random.choice(activity_types)
+                duration = random.randint(20, 120)
+                distance = random.uniform(1.0, 20.0) if activity_type in ['Running', 'Swimming', 'Cycling'] else None
+                calories = duration * random.randint(5, 12)
+                activity_date = date.today() - timedelta(days=random.randint(0, 30))
+                
+                Activity.objects.create(
+                    user_id=user.id,
+                    activity_type=activity_type,
+                    duration=duration,
+                    distance=round(distance, 2) if distance else None,
+                    calories=calories,
+                    date=activity_date
+                )
+
+        self.stdout.write('Creating leaderboard entries...')
+        
+        # Create leaderboard entries based on total calories
+        for user in all_users:
+            total_calories = sum(a.calories for a in Activity.objects.filter(user_id=user.id))
+            Leaderboard.objects.create(
+                user_id=user.id,
+                points=total_calories,
+                rank=0  # Will be updated after all entries are created
+            )
+        
+        # Update ranks based on points
+        leaderboard_entries = Leaderboard.objects.all().order_by('-points')
+        for rank, entry in enumerate(leaderboard_entries, start=1):
+            entry.rank = rank
+            entry.save()
+
+        self.stdout.write('Creating workouts...')
+        
+        # Create workout suggestions
         workouts = [
-            {"name": "Strength Training", "suggested_for": ["Superman", "Wonder Woman"]},
-            {"name": "Agility Drills", "suggested_for": ["Batman", "Black Widow"]},
+            {
+                'name': 'Captain America\'s Shield Training',
+                'description': 'Build strength and endurance with shield-throwing exercises',
+                'difficulty': 'intermediate',
+                'duration': 45,
+                'category': 'Strength Training'
+            },
+            {
+                'name': 'Flash Speed Workout',
+                'description': 'High-intensity interval training to increase speed',
+                'difficulty': 'advanced',
+                'duration': 30,
+                'category': 'Running'
+            },
+            {
+                'name': 'Wonder Woman Warrior Training',
+                'description': 'Full-body workout inspired by Amazon warriors',
+                'difficulty': 'intermediate',
+                'duration': 60,
+                'category': 'Strength Training'
+            },
+            {
+                'name': 'Aquaman Swimming Circuit',
+                'description': 'Swimming techniques for ocean-level performance',
+                'difficulty': 'advanced',
+                'duration': 50,
+                'category': 'Swimming'
+            },
+            {
+                'name': 'Black Widow Agility Training',
+                'description': 'Flexibility and agility exercises for spy-level fitness',
+                'difficulty': 'intermediate',
+                'duration': 40,
+                'category': 'Yoga'
+            },
+            {
+                'name': 'Hulk Strength Builder',
+                'description': 'Maximum strength training for incredible power',
+                'difficulty': 'advanced',
+                'duration': 55,
+                'category': 'Strength Training'
+            },
+            {
+                'name': 'Superman Flight Training',
+                'description': 'Core and cardio workout for super endurance',
+                'difficulty': 'beginner',
+                'duration': 35,
+                'category': 'Running'
+            },
+            {
+                'name': 'Batman Night Patrol',
+                'description': 'Stealth and endurance training for crime fighters',
+                'difficulty': 'intermediate',
+                'duration': 45,
+                'category': 'Cycling'
+            },
         ]
+        
+        for workout_data in workouts:
+            Workout.objects.create(**workout_data)
 
-        db.users.insert_many(users)
-        db.teams.insert_many(teams)
-        db.activities.insert_many(activities)
-        db.leaderboard.insert_many(leaderboard)
-        db.workouts.insert_many(workouts)
-
-        self.stdout.write(self.style.SUCCESS('octofit_db database populated with test data.'))
+        self.stdout.write(self.style.SUCCESS('Successfully populated database with superhero test data!'))
+        self.stdout.write(f'Created {User.objects.count()} users')
+        self.stdout.write(f'Created {Team.objects.count()} teams')
+        self.stdout.write(f'Created {Activity.objects.count()} activities')
+        self.stdout.write(f'Created {Leaderboard.objects.count()} leaderboard entries')
+        self.stdout.write(f'Created {Workout.objects.count()} workouts')
